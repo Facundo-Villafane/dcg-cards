@@ -1,0 +1,37 @@
+# Keeps cards/ in sync with TakaOtaku's scans: every Monday, or by hand from the Actions tab.
+# Downloads in batches and commits each one, so the first (big) sync never makes a huge push.
+name: Sync card images
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Download new scans in batches
+        run: |
+          git config user.name "card-sync[bot]"
+          git config user.email "card-sync@users.noreply.github.com"
+          for i in $(seq 1 20); do
+            node scripts/sync.mjs --limit 1200
+            n=$(cat downloaded.txt)
+            if [ "$n" = "0" ]; then break; fi
+            git add cards
+            git commit -m "Sync $n card images" || break
+            git push
+          done
